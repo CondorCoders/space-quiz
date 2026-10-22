@@ -127,6 +127,16 @@
     .results .score-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.8px; }
     .result-stats { display: flex; justify-content: center; gap: 30px; padding: 24px 0; margin: 23px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); }
     .result-stats strong { display: block; font-size: 20px; color: var(--text); margin-bottom: 5px; }
+    .missed-review { margin: 0 0 22px; border: 1px solid var(--border); border-radius: 10px; text-align: left; }
+    .missed-review summary { padding: 13px 15px; color: var(--text); font-size: 13px; font-weight: 650; cursor: pointer; }
+    .missed-review summary:focus-visible { outline: 3px solid #e96c4080; outline-offset: 2px; border-radius: 8px; }
+    .missed-answers { display: grid; gap: 12px; margin: 0; padding: 0 15px 15px; list-style: none; }
+    .missed-answer { padding-top: 12px; border-top: 1px solid var(--border); }
+    .missed-answer h3 { margin: 0 0 8px; color: var(--text); font-size: 13px; line-height: 1.5; }
+    .missed-answer p { max-width: none; margin: 4px 0 0; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+    .missed-answer .your-answer { color: var(--red); }
+    .missed-answer .correct-answer { color: var(--green); }
+    .no-misses { margin: 0 0 22px !important; padding: 13px 15px; border: 1px solid var(--border); border-radius: 10px; color: var(--text) !important; text-align: left; }
     .results .primary { width: 100%; font-size: 14px; padding: 14px; }
     @keyframes float { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-6px) rotate(2deg); } }
     @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
@@ -229,6 +239,11 @@
           <div><strong id="correct-total"></strong>Correct answers</div>
           <div><strong id="accuracy"></strong>Accuracy</div>
         </div>
+        <details class="missed-review" id="missed-review" open>
+          <summary>Review missed answers</summary>
+          <ol class="missed-answers" id="missed-answers"></ol>
+        </details>
+        <p class="no-misses" id="no-misses" hidden>No missed answers — you got every question right.</p>
         <button class="primary" id="restart">Explore again <span aria-hidden="true">↗</span></button>
       </div>
     </section>
@@ -252,6 +267,7 @@
     let current = 0;
     let score = 0;
     let answered = false;
+    let selectedAnswers = [];
 
     function updateProgress(completed) {
       $(".progress-fill").style.width = `${completed / questions.length * 100}%`;
@@ -292,6 +308,7 @@
       answered = true;
       const item = questions[current];
       const correct = index === item.correct;
+      selectedAnswers[current] = index;
       if (correct) score++;
       $("#score").textContent = score;
       [...$("#answers").children].forEach((button, answerIndex) => {
@@ -333,6 +350,29 @@
       $("#final-score").innerHTML = `${score}<span> / ${questions.length}</span>`;
       $("#correct-total").textContent = `${score} of ${questions.length}`;
       $("#accuracy").textContent = `${Math.round(score / questions.length * 100)}%`;
+      const missedAnswers = $("#missed-answers");
+      missedAnswers.replaceChildren(...questions.flatMap((item, questionIndex) => {
+        const selected = selectedAnswers[questionIndex];
+        if (selected === item.correct) return [];
+        const entry = document.createElement("li");
+        entry.className = "missed-answer";
+        const question = document.createElement("h3");
+        question.textContent = item.question;
+        const yourAnswer = document.createElement("p");
+        yourAnswer.className = "your-answer";
+        yourAnswer.textContent = `Your answer (incorrect): ${item.answers[selected]}`;
+        const correctAnswer = document.createElement("p");
+        correctAnswer.className = "correct-answer";
+        correctAnswer.textContent = `Correct answer: ${item.answers[item.correct]}`;
+        const fact = document.createElement("p");
+        fact.textContent = item.fact;
+        entry.append(question, yourAnswer, correctAnswer, fact);
+        return [entry];
+      }));
+      const hasMissedAnswers = missedAnswers.childElementCount > 0;
+      $("#missed-review").hidden = !hasMissedAnswers;
+      $("#missed-review").open = true;
+      $("#no-misses").hidden = hasMissedAnswers;
       $("#result-title").focus();
     }
 
@@ -345,6 +385,7 @@
     $("#restart").addEventListener("click", () => {
       current = 0;
       score = 0;
+      selectedAnswers = [];
       $("#score").textContent = "0";
       $("#results").hidden = true;
       $("#quiz").hidden = false;
