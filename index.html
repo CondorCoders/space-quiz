@@ -92,6 +92,7 @@
     .category::before { content: ""; width: 5px; height: 5px; background: var(--accent); border-radius: 50%; }
     h2 { margin: 10px 0 20px; font-size: 23px; letter-spacing: -.65px; line-height: 1.4; font-weight: 650; }
     .answers { display: grid; gap: 9px; }
+    .keyboard-hint { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
     .answer { width: 100%; display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 11px 13px; border-radius: 10px; text-align: left; cursor: pointer; transition: background .2s, border-color .2s, transform .2s; min-height: 49px; font-size: 14px; }
     .answer:not(:disabled):hover { border-color: #efaa90; background: #e96c4006; transform: translateX(2px); }
     .letter { display: grid; place-items: center; border: 1px solid var(--border); background: var(--soft); color: var(--muted); width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0; font-size: 11px; font-weight: 550; }
@@ -211,6 +212,7 @@
           <div class="category" id="category"></div>
           <h2 id="question" tabindex="-1"></h2>
           <div class="answers" id="answers" role="group" aria-labelledby="question"></div>
+          <p class="keyboard-hint">Press <kbd>A</kbd>–<kbd>D</kbd> to choose, or use <kbd>Tab</kbd> to focus an answer and <kbd>Enter</kbd>/<kbd>Space</kbd> to select it.</p>
         </div>
         <div id="feedback" class="feedback" role="status" aria-live="polite" hidden></div>
         <div class="card-bottom">
@@ -267,6 +269,7 @@
       $("#answers").replaceChildren(...item.answers.map((text, index) => {
         const button = document.createElement("button");
         button.className = "answer";
+        button.setAttribute("aria-keyshortcuts", String.fromCharCode(65 + index));
         const letter = document.createElement("span");
         letter.className = "letter";
         letter.setAttribute("aria-hidden", "true");
