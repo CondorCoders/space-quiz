@@ -15,8 +15,10 @@ feedback: the score stays 1, the selected answer shakes red, and Neil Armstrong
 is revealed as correct.
 
 For a full smoke test, complete mixed, perfect, and zero-score runs. Verify
-results, accuracy, emoji reactions, full progress, and replay reset. Exercise
-actual Tab/Shift+Tab and Enter/Space navigation as well as A-D shortcuts.
+results, accuracy, emoji reactions, full progress, missed-answer review order
+and details, the perfect-score no-misses message, and replay reset. Exercise
+actual Tab/Shift+Tab and Enter/Space navigation, including the review
+disclosure, as well as A-D shortcuts.
 Dispatched JavaScript keyboard events check shortcut handlers, not native
 browser keyboard navigation.
 
@@ -30,10 +32,11 @@ before asserting its final computed color.
 question data, and plain JavaScript. The script runs after the markup; `$` is
 a local `document.querySelector` shorthand, not a library.
 
-The quiz uses an ordered `questions` array and three in-memory state variables:
-`current` (zero-based question index), `score`, and `answered`. Each question
-has `category`, `question`, four `answers`, a zero-based `correct` index, and
-an explanatory `fact`.
+The quiz uses an ordered `questions` array and four in-memory state variables:
+`current` (zero-based question index), `score`, `answered`, and
+`selectedAnswers` (the selected answer index for each question in the current
+attempt). Each question has `category`, `question`, four `answers`, a
+zero-based `correct` index, and an explanatory `fact`.
 
 - `renderQuestion()` rebuilds answer buttons, clears feedback, disables Next,
   and optionally focuses the question heading.
@@ -41,8 +44,10 @@ an explanatory `fact`.
   awards at most one point, reveals the correct answer and explanation,
   updates completed-question progress, and focuses Next.
 - Next advances only after an answer; the last question opens `showResults()`.
-  Results replace the quiz within the same card using `hidden`.
-- Replay resets all three state variables, score display, and progress before
+  Results replace the quiz within the same card using `hidden`. They include
+  an expanded-by-default native disclosure reviewing missed answers in play
+  order, or a short no-misses message after a perfect run.
+- Replay resets all four state variables, score display, and progress before
   rendering the first question. Reloading also starts a fresh quiz.
 
 Progress counts answered questions, not the displayed question number.
