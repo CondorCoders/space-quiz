@@ -250,6 +250,7 @@
     .results h2 { font-size: 27px; }
     .result-score { margin: 12px 0 5px; color: var(--accent); font-size: 42px; font-weight: 850; letter-spacing: -.05em; }
     .result-copy { max-width: 350px; margin: 0 auto 22px; color: var(--muted); }
+    .result-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
     .restart {
       padding: 12px 20px;
       border: 0;
@@ -305,7 +306,7 @@
     <section class="card" aria-label="Cuestionario de exploración espacial">
       <div id="quiz" class="card-inner">
         <div class="topline">
-          <span id="counter">Pregunta 1 de 10</span>
+          <span id="counter" aria-live="polite" aria-atomic="true">Pregunta 1 de 10</span>
           <span class="score-pill">Puntos <strong id="score">0</strong></span>
         </div>
         <div class="progress-track" role="progressbar" aria-label="Progreso del cuestionario" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0">
@@ -313,7 +314,7 @@
         </div>
         <p class="eyebrow">Misión de conocimiento</p>
         <h1 class="sr-only">Quiz de exploración espacial</h1>
-        <p id="question" class="question"></p>
+        <p id="question" class="question" tabindex="-1"></p>
         <div id="answers" class="answers" role="group" aria-label="Opciones de respuesta"></div>
         <p id="feedback" class="feedback" aria-live="polite"></p>
       </div>
@@ -339,16 +340,30 @@
     let current = 0;
     let score = 0;
     let locked = false;
+    let failedQuestions = [];
+    let reviewIndex = 0;
+    let isReviewing = false;
+    let reviewCompleted = false;
     const questionEl = document.querySelector("#question");
     const answersEl = document.querySelector("#answers");
     const feedbackEl = document.querySelector("#feedback");
     const progressEl = document.querySelector("#progress");
     const progressTrack = document.querySelector(".progress-track");
 
-    function renderQuestion() {
+    function activeQuestions() {
+      return isReviewing ? failedQuestions : questions;
+    }
+
+    function activeIndex() {
+      return isReviewing ? reviewIndex : current;
+    }
+
+    function renderQuestion({ focus = false } = {}) {
       locked = false;
-      const item = questions[current];
-      document.querySelector("#counter").textContent = `Pregunta ${current + 1} de ${questions.length}`;
+      const items = activeQuestions();
+      const index = activeIndex();
+      const item = items[index];
+      document.querySelector("#counter").textContent = `${isReviewing ? "Repaso" : "Pregunta"} ${index + 1} de ${items.length}`;
       document.querySelector("#score").textContent = score;
       questionEl.textContent = item.question;
       feedbackEl.textContent = "";
@@ -364,29 +379,43 @@
         button.addEventListener("click", () => chooseAnswer(index, button));
         answersEl.append(button);
       });
-      const completed = current;
-      progressEl.style.width = `${(completed / questions.length) * 100}%`;
+      const completed = index;
+      progressEl.style.width = `${(completed / items.length) * 100}%`;
+      progressTrack.setAttribute("aria-valuemax", items.length);
       progressTrack.setAttribute("aria-valuenow", completed);
+      if (focus) questionEl.focus();
     }
 
     function chooseAnswer(index, selected) {
       if (locked) return;
       locked = true;
-      const item = questions[current];
+      const item = activeQuestions()[activeIndex()];
       const correct = index === item.correct;
-      if (correct) score += 1;
+      if (!isReviewing) {
+        if (correct) score += 1;
+        else failedQuestions.push(item);
+      }
       document.querySelector("#score").textContent = score;
       selected.classList.add(correct ? "correct" : "incorrect");
       if (!correct) answersEl.children[item.correct].classList.add("reveal-correct");
       [...answersEl.children].forEach(button => { button.disabled = true; });
       feedbackEl.textContent = `${correct ? "¡Correcto!" : "No exactamente."} ${item.fact}`;
       feedbackEl.classList.add(correct ? "good" : "bad");
-      progressEl.style.width = `${((current + 1) / questions.length) * 100}%`;
-      progressTrack.setAttribute("aria-valuenow", current + 1);
+      const items = activeQuestions();
+      const nextIndex = activeIndex() + 1;
+      progressEl.style.width = `${(nextIndex / items.length) * 100}%`;
+      progressTrack.setAttribute("aria-valuemax", items.length);
+      progressTrack.setAttribute("aria-valuenow", nextIndex);
       window.setTimeout(() => {
-        current += 1;
-        if (current === questions.length) showResults();
-        else renderQuestion();
+        if (isReviewing) reviewIndex += 1;
+        else current += 1;
+        if (activeIndex() === activeQuestions().length) {
+          if (isReviewing) {
+            isReviewing = false;
+            reviewCompleted = true;
+          }
+          showResults();
+        } else renderQuestion({ focus: true });
       }, 1500);
     }
 
@@ -399,21 +428,38 @@
         score >= 7 ? "Tienes madera de astronauta. El universo te sienta bien." :
         score >= 4 ? "Vas por buen camino: cada dato te acerca a las estrellas." :
         "Toda gran misión empieza con curiosidad. ¡Despega otra vez!";
-      results.innerHTML = `<span class="result-emoji" aria-hidden="true">${reaction}</span><p class="eyebrow">Misión completada</p><h2>${title}</h2><p class="result-score">${score}<span style="font-size:20px;color:var(--muted)"> / ${questions.length}</span></p><p class="result-copy">${message}</p><button class="restart" type="button">Volver a intentarlo</button>`;
+      const reviewAction = failedQuestions.length && !reviewCompleted ?
+        `<button class="restart review" type="button">Repasar preguntas falladas (${failedQuestions.length})</button>` : "";
+      results.innerHTML = `<span class="result-emoji" aria-hidden="true">${reaction}</span><p class="eyebrow">Misión completada</p><h2 tabindex="-1">${title}</h2><p class="result-score">${score}<span style="font-size:20px;color:var(--muted)"> / ${questions.length}</span></p><p class="result-copy">${message}</p><div class="result-actions">${reviewAction}<button class="restart restart-game" type="button">Volver a intentarlo</button></div>`;
       results.classList.remove("hidden");
-      results.querySelector(".restart").addEventListener("click", restart);
+      results.querySelector("h2").focus();
+      results.querySelector(".restart-game").addEventListener("click", restart);
+      results.querySelector(".review")?.addEventListener("click", startReview);
       document.querySelector("#card-footer").textContent = "Gracias por explorar con Órbita";
+    }
+
+    function startReview() {
+      isReviewing = true;
+      reviewIndex = 0;
+      document.querySelector("#results").classList.add("hidden");
+      document.querySelector("#quiz").classList.remove("hidden");
+      document.querySelector("#card-footer").textContent = "Repaso de preguntas falladas";
+      renderQuestion({ focus: true });
     }
 
     function restart() {
       current = 0;
       score = 0;
+      failedQuestions = [];
+      reviewIndex = 0;
+      isReviewing = false;
+      reviewCompleted = false;
       document.querySelector("#quiz").classList.remove("hidden");
       const results = document.querySelector("#results");
       results.classList.add("hidden");
       results.replaceChildren();
       document.querySelector("#card-footer").textContent = "10 preguntas · Una pequeña vuelta por el universo";
-      renderQuestion();
+      renderQuestion({ focus: true });
     }
 
     renderQuestion();
